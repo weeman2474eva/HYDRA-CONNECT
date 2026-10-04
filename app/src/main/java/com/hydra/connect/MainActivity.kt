@@ -177,6 +177,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent?.getBooleanExtra("open_messages", false) == true && token.isNotBlank()) {
+            loadHome(true)
+        }
+    }
+
     override fun onDestroy() {
         notificationHandler.removeCallbacks(messagePoll)
         super.onDestroy()
@@ -642,8 +650,8 @@ class MainActivity : AppCompatActivity() {
         launch.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         val pending = PendingIntent.getActivity(this, 81, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(this, "hydra_messages")
-            .setSmallIcon(android.R.drawable.ic_dialog_email)
-            .setContentTitle("New HYDRA CONNECT message")
+            .setSmallIcon(android.R.drawable.ic_dialog_email)\n            .setNumber(unreadMessages.coerceAtLeast(1))\n            .setCategory(NotificationCompat.CATEGORY_MESSAGE)\n            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setContentTitle("New message from your seller")
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
