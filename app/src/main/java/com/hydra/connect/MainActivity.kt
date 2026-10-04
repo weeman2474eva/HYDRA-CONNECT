@@ -309,6 +309,47 @@ class MainActivity : AppCompatActivity() {
         root.addView(box)
     }
 
+    private fun launcherScreen() {
+        baseScreen("App Launcher", "Your installed apps in one place", true)
+        val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = packageManager.queryIntentActivities(intent, 0)
+            .filter { it.activityInfo.packageName != packageName }
+            .sortedBy { it.loadLabel(packageManager).toString().lowercase() }
+
+        if (apps.isEmpty()) { emptyState("No launchable apps were found."); return }
+
+        val grid = GridLayout(this).apply { columnCount = 3; alignmentMode = GridLayout.ALIGN_BOUNDS }
+        val width = (resources.displayMetrics.widthPixels - dp(40) - dp(20)) / 3
+        for (info in apps) {
+            val item = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(dp(8), dp(12), dp(8), dp(12))
+                background = rounded(panel, 18, 1, Color.rgb(35, 55, 64))
+                isClickable = true
+            }
+            val icon = ImageView(this).apply {
+                setImageDrawable(info.loadIcon(packageManager))
+                scaleType = ImageView.ScaleType.FIT_CENTER
+            }
+            item.addView(icon, LinearLayout.LayoutParams(dp(52), dp(52)))
+            item.addView(Space(this), LinearLayout.LayoutParams(1, dp(8)))
+            item.addView(label(info.loadLabel(packageManager).toString(), 12f, Color.WHITE, true).apply {
+                gravity = Gravity.CENTER; maxLines = 2
+            })
+            item.setOnClickListener {
+                packageManager.getLaunchIntentForPackage(info.activityInfo.packageName)?.let { launch ->
+                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(launch)
+                }
+            }
+            grid.addView(item, GridLayout.LayoutParams().apply {
+                this.width = width; height = dp(118)
+                setMargins(0, 0, dp(10), dp(10))
+            })
+        }
+        root.addView(grid)
+    }
+
     private fun appsScreen() {
         baseScreen("Apps", "Recommended downloads and tools", true)
         val apps = portal.optJSONArray("apps") ?: JSONArray()
