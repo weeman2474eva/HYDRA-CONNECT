@@ -392,6 +392,14 @@ class MainActivity : AppCompatActivity() {
             box.addView(label(p.optString("title", "Update"), 18f, Color.WHITE, true))
             box.addView(Space(this), LinearLayout.LayoutParams(1, dp(7))); box.addView(label(p.optString("body"), 14f, muted))
             box.addView(Space(this), LinearLayout.LayoutParams(1, dp(10))); box.addView(label(p.optString("created_at"), 11f, Color.rgb(108, 128, 138)))
+            val dismiss = label("DELETE", 11f, Color.rgb(255, 120, 130), true).apply { setPadding(0, dp(12), 0, dp(4)); isClickable = true }
+            dismiss.setOnClickListener {
+                AlertDialog.Builder(this).setTitle("Delete notification?").setMessage("This will remove it from your app.")
+                    .setNegativeButton("Cancel", null).setPositiveButton("Delete") { _, _ ->
+                        post("dismiss.php", JSONObject().put("type", "post").put("id", p.optInt("id")), true) { r -> if (r.optBoolean("ok")) loadHome() else toast("Could not delete notification") }
+                    }.show()
+            }
+            box.addView(dismiss)
             root.addView(box); spacer(12)
         }
     }
@@ -419,10 +427,29 @@ class MainActivity : AppCompatActivity() {
             bubble.addView(label(if (mine) "YOU" else "SELLER", 10f, if (mine) accent else muted, true))
             bubble.addView(label(m.optString("body"), 15f, Color.WHITE))
             bubble.addView(label(m.optString("created_at"), 10f, muted))
+            val del = label("DELETE", 10f, Color.rgb(255, 120, 130), true).apply { setPadding(0, dp(8), 0, 0); isClickable = true }
+            del.setOnClickListener {
+                AlertDialog.Builder(this).setTitle("Delete message?").setMessage("This removes the message from your inbox.")
+                    .setNegativeButton("Cancel", null).setPositiveButton("Delete") { _, _ ->
+                        post("messages.php", JSONObject().put("action", "delete").put("id", m.optInt("id")), true) { r -> if (r.optBoolean("ok")) messagesRender(r.optJSONArray("messages") ?: JSONArray()) else toast("Could not delete message") }
+                    }.show()
+            }
+            bubble.addView(del)
             val lp = LinearLayout.LayoutParams((resources.displayMetrics.widthPixels * 0.78).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 gravity = if (mine) Gravity.END else Gravity.START; bottomMargin = dp(10)
             }
             root.addView(bubble, lp)
+        }
+        spacer(4)
+        if (messages.length() > 0) {
+            val clear = label("CLEAR CONVERSATION", 11f, Color.rgb(255, 120, 130), true).apply { gravity = Gravity.CENTER; setPadding(dp(10), dp(12), dp(10), dp(12)); isClickable = true }
+            clear.setOnClickListener {
+                AlertDialog.Builder(this).setTitle("Clear conversation?").setMessage("This removes all messages from your app. The seller keeps their copy.")
+                    .setNegativeButton("Cancel", null).setPositiveButton("Clear") { _, _ ->
+                        post("messages.php", JSONObject().put("action", "clear"), true) { r -> if (r.optBoolean("ok")) messagesRender(r.optJSONArray("messages") ?: JSONArray()) else toast("Could not clear messages") }
+                    }.show()
+            }
+            root.addView(clear)
         }
         spacer(8)
         val msg = input("Write a message…", false, 3); root.addView(msg)
