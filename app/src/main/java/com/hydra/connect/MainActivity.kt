@@ -169,11 +169,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadHome() {
+    private fun loadHome(openMessages: Boolean = false) {
         get("portal.php") { j ->
             if (!j.optBoolean("ok")) { logout(); return@get }
             portal = j
-            homeScreen()
+            if (openMessages) messagesScreen() else homeScreen()
         }
     }
 
@@ -646,11 +646,16 @@ class MainActivity : AppCompatActivity() {
     private fun showMessageNotification(body: String) {
         if (android.os.Build.VERSION.SDK_INT >= 33 &&
             ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
-        val launch = packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java)
-        launch.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        val launch = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("open_messages", true)
+        }
         val pending = PendingIntent.getActivity(this, 81, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(this, "hydra_messages")
-            .setSmallIcon(android.R.drawable.ic_dialog_email)\n            .setNumber(unreadMessages.coerceAtLeast(1))\n            .setCategory(NotificationCompat.CATEGORY_MESSAGE)\n            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            .setNumber(unreadMessages.coerceAtLeast(1))
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setContentTitle("New message from your seller")
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
