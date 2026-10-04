@@ -148,69 +148,172 @@ class MainActivity : AppCompatActivity() {
     private fun homeScreen() {
         val settings = portal.optJSONObject("settings") ?: JSONObject()
         val customer = portal.optJSONObject("customer") ?: JSONObject()
-        baseScreen(settings.optString("brand_name", "HYDRA CONNECT"), settings.optString("welcome", "Everything you need, in one place."))
 
-        val account = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(16), dp(18), dp(16)); background = rounded(panel, 20)
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            setBackgroundColor(Color.rgb(2, 10, 14))
         }
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        val left = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        left.addView(label("MY SERVICE", 12f, accent, true))
-        left.addView(label(customer.optString("username", "Account"), 20f, Color.WHITE, true))
-        row.addView(left, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        val status = customer.optString("status", "active").uppercase()
-        val chip = label(status, 12f, if (status == "ACTIVE") accent else Color.rgb(255, 180, 80), true).apply {
-            setPadding(dp(12), dp(8), dp(12), dp(8)); background = rounded(Color.rgb(13, 50, 49), 20)
+        root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(30))
         }
-        row.addView(chip); account.addView(row)
-        account.addView(Space(this), LinearLayout.LayoutParams(1, dp(12)))
-        account.addView(label("Expires  •  " + customer.optString("expiry_at", "Not available"), 14f, muted))
-        account.setOnClickListener { serviceScreen() }; account.isClickable = true; account.isFocusable = true
-        root.addView(account)
-        spacer(18)
+        scroll.addView(root)
+        setContentView(scroll)
 
-        val grid = GridLayout(this).apply { columnCount = if (resources.configuration.screenWidthDp >= 700) 3 else 2; alignmentMode = GridLayout.ALIGN_BOUNDS }
-        addTile(grid, "NEWS", "News & Updates", "Latest announcements", "news")
-        addTile(grid, "CHAT", "Messages", "Contact your seller", "messages")
-        addTile(grid, "HELP", "Report a Problem", "Get support", "ticket")
-        addTile(grid, "LIVE", "Service Status", settings.optString("service_status", "All systems operational"), "status")
-        addTile(grid, "APPS", "Apps", "Downloads & tools", "apps")
-        addTile(grid, "RENEW", "Renew Service", "Request a renewal", "renew")
+        // HYDRA hero
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(18), dp(22), dp(18), dp(20))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.rgb(8, 42, 48), Color.rgb(4, 20, 27), Color.rgb(2, 11, 16))
+            ).apply { cornerRadius = dp(26).toFloat(); setStroke(dp(1), Color.rgb(20, 91, 96)) }
+        }
+        val mark = label("♆", 46f, accent, true).apply {
+            gravity = Gravity.CENTER
+            setShadowLayer(18f, 0f, 0f, accent)
+        }
+        hero.addView(mark)
+        hero.addView(label(settings.optString("brand_name", "HYDRA CONNECT").uppercase(), 27f, Color.WHITE, true).apply {
+            gravity = Gravity.CENTER; letterSpacing = .08f
+        })
+        hero.addView(label("EVERYTHING YOU NEED, IN ONE PLACE.", 10f, accent, true).apply {
+            gravity = Gravity.CENTER; letterSpacing = .16f
+        })
+        root.addView(hero)
+        spacer(14)
+
+        // Service glass card
+        val service = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(16), dp(18), dp(16))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.rgb(13, 39, 45), Color.rgb(8, 27, 34))
+            ).apply { cornerRadius = dp(22).toFloat(); setStroke(dp(1), Color.rgb(28, 104, 108)) }
+            isClickable = true
+        }
+        val serviceTop = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val svcLeft = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        svcLeft.addView(label("MY SERVICE", 10f, accent, true).apply { letterSpacing = .16f })
+        svcLeft.addView(label(customer.optString("username", "Account"), 20f, Color.WHITE, true))
+        serviceTop.addView(svcLeft, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val statusText = customer.optString("status", "active").uppercase()
+        serviceTop.addView(label("●  $statusText", 11f, accent, true).apply {
+            setPadding(dp(11), dp(7), dp(11), dp(7))
+            background = rounded(Color.rgb(5, 54, 52), 20, 1, Color.rgb(19, 105, 99))
+        })
+        service.addView(serviceTop)
+        service.addView(Space(this), LinearLayout.LayoutParams(1, dp(13)))
+        val expRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        expRow.addView(label("EXPIRY", 10f, muted, true))
+        expRow.addView(label(customer.optString("expiry_at", "Not available"), 13f, Color.WHITE, true), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(12) })
+        expRow.addView(label("›", 26f, accent, true))
+        service.addView(expRow)
+        service.setOnClickListener { serviceScreen() }
+        root.addView(service)
+        spacer(17)
+
+        root.addView(label("QUICK ACCESS", 11f, Color.rgb(116, 151, 159), true).apply {
+            letterSpacing = .16f; setPadding(dp(2), 0, 0, dp(10))
+        })
+
+        val grid = GridLayout(this).apply { columnCount = 2; alignmentMode = GridLayout.ALIGN_BOUNDS }
+        addPremiumTile(grid, "✦", "News & Updates", "Latest announcements", "news")
+        addPremiumTile(grid, "✉", "Messages", "Contact your seller", "messages")
+        addPremiumTile(grid, "!", "Report a Problem", "Get help quickly", "ticket")
+        addPremiumTile(grid, "●", "Service Status", settings.optString("service_status", "All systems operational"), "status")
+        addPremiumTile(grid, "⬡", "App Launcher", "Open installed apps", "launcher")
+        addPremiumTile(grid, "↓", "Downloads", "Recommended apps", "apps")
+        addPremiumTile(grid, "↻", "Renew Service", "Request renewal", "renew")
+        addPremiumTile(grid, "◉", "My Details", "Account information", "details")
         root.addView(grid)
-        spacer(18)
-        val sign = actionButton("Sign out", true)
-        root.addView(sign, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)))
-        sign.setOnClickListener { AlertDialog.Builder(this).setTitle("Sign out?").setMessage("You will need to sign in again.").setNegativeButton("Cancel", null).setPositiveButton("Sign out") { _, _ -> logout() }.show() }
+        spacer(8)
+
+        val sign = TextView(this).apply {
+            text = "SIGN OUT"; gravity = Gravity.CENTER; textSize = 12f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.rgb(143, 168, 174)); letterSpacing = .15f
+            setPadding(dp(14), dp(15), dp(14), dp(15))
+            background = rounded(Color.rgb(7, 22, 28), 16, 1, Color.rgb(24, 55, 63))
+            isClickable = true
+            setOnClickListener {
+                AlertDialog.Builder(this@MainActivity).setTitle("Sign out?").setMessage("You will need to sign in again.")
+                    .setNegativeButton("Cancel", null).setPositiveButton("Sign out") { _, _ -> logout() }.show()
+            }
+        }
+        root.addView(sign)
     }
 
-    private fun addTile(grid: GridLayout, badge: String, title: String, sub: String, action: String) {
+    private fun addPremiumTile(grid: GridLayout, glyph: String, title: String, sub: String, action: String) {
         val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; gravity = Gravity.START
-            setPadding(dp(16), dp(16), dp(16), dp(16)); background = rounded(panel, 18, 1, Color.rgb(34, 51, 60))
-            isClickable = true; isFocusable = true
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(15), dp(12), dp(13))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.rgb(11, 34, 41), Color.rgb(5, 20, 27))
+            ).apply { cornerRadius = dp(20).toFloat(); setStroke(dp(1), Color.rgb(25, 66, 73)) }
+            isClickable = true
         }
-        val icon = label(badge, 11f, accent, true).apply { setPadding(dp(9), dp(6), dp(9), dp(6)); background = rounded(Color.rgb(13, 50, 49), 10) }
-        card.addView(icon); card.addView(Space(this), LinearLayout.LayoutParams(1, dp(14)))
-        card.addView(label(title, 17f, Color.WHITE, true)); card.addView(Space(this), LinearLayout.LayoutParams(1, dp(5)))
-        card.addView(label(sub, 13f, muted))
-        card.setOnFocusChangeListener { v, focused ->
-            v.background = rounded(if (focused) Color.rgb(25, 55, 62) else panel, 18, if (focused) 2 else 1, if (focused) accent else Color.rgb(34, 51, 60))
-            v.scaleX = if (focused) 1.035f else 1f; v.scaleY = if (focused) 1.035f else 1f
+        val icon = TextView(this).apply {
+            text = glyph; gravity = Gravity.CENTER; textSize = 25f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(accent); setShadowLayer(12f, 0f, 0f, accent)
+            background = rounded(Color.rgb(5, 48, 51), 18, 1, Color.rgb(24, 114, 109))
         }
+        card.addView(icon, LinearLayout.LayoutParams(dp(58), dp(58)))
+        card.addView(Space(this), LinearLayout.LayoutParams(1, dp(10)))
+        card.addView(label(title, 15f, Color.WHITE, true).apply { gravity = Gravity.CENTER })
+        card.addView(Space(this), LinearLayout.LayoutParams(1, dp(4)))
+        card.addView(label(sub, 11f, Color.rgb(125, 153, 160)).apply { gravity = Gravity.CENTER; maxLines = 2 })
         card.setOnClickListener {
             when (action) {
                 "news" -> newsScreen()
                 "messages" -> messagesScreen()
                 "ticket" -> ticketScreen()
                 "status" -> statusScreen()
+                "launcher" -> launcherScreen()
                 "apps" -> appsScreen()
                 "renew" -> renewScreen()
+                "details" -> serviceScreen()
             }
         }
-        val cols = grid.columnCount
-        val width = (resources.displayMetrics.widthPixels - dp(40) - dp(12) * (cols - 1)) / cols
-        val lp = GridLayout.LayoutParams().apply { this.width = width; height = dp(158); setMargins(0, 0, if (grid.childCount % cols != cols - 1) dp(12) else 0, dp(12)) }
-        grid.addView(card, lp)
+        val width = (resources.displayMetrics.widthPixels - dp(48)) / 2
+        grid.addView(card, GridLayout.LayoutParams().apply {
+            this.width = width; height = dp(156)
+            setMargins(0, 0, dp(10), dp(10))
+        })
+    }
+
+    private fun launcherScreen() {
+        baseScreen("App Launcher", "Open apps installed on your phone", true)
+        val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = packageManager.queryIntentActivities(intent, 0)
+            .filter { it.activityInfo.packageName != packageName }
+            .sortedBy { it.loadLabel(packageManager).toString().lowercase() }
+        if (apps.isEmpty()) { emptyState("No launchable apps were found."); return }
+        val grid = GridLayout(this).apply { columnCount = 3; alignmentMode = GridLayout.ALIGN_BOUNDS }
+        val width = (resources.displayMetrics.widthPixels - dp(60)) / 3
+        for (info in apps) {
+            val item = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
+                setPadding(dp(7), dp(12), dp(7), dp(10))
+                background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(11,34,41), Color.rgb(5,20,27))).apply {
+                    cornerRadius = dp(18).toFloat(); setStroke(dp(1), Color.rgb(25,66,73))
+                }
+                isClickable = true
+            }
+            item.addView(ImageView(this).apply { setImageDrawable(info.loadIcon(packageManager)); scaleType = ImageView.ScaleType.FIT_CENTER }, LinearLayout.LayoutParams(dp(50), dp(50)))
+            item.addView(Space(this), LinearLayout.LayoutParams(1, dp(8)))
+            item.addView(label(info.loadLabel(packageManager).toString(), 11f, Color.WHITE, true).apply { gravity = Gravity.CENTER; maxLines = 2 })
+            item.setOnClickListener {
+                packageManager.getLaunchIntentForPackage(info.activityInfo.packageName)?.let { launch ->
+                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(launch)
+                }
+            }
+            grid.addView(item, GridLayout.LayoutParams().apply { this.width = width; height = dp(112); setMargins(0,0,dp(8),dp(8)) })
+        }
+        root.addView(grid)
     }
 
     private fun serviceScreen() {
