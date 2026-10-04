@@ -1,0 +1,1 @@
+<resources><style name="Theme.HydraConnect" parent="Theme.MaterialComponents.DayNight.NoActionBar"><item name="android:fontFamily">sans</item><item name="colorPrimary">#16D6C4</item><item name="android:navigationBarColor">#081014</item><item name="android:windowLightStatusBar">false</item><item name="android:statusBarColor">#081014</item></style></resources>
