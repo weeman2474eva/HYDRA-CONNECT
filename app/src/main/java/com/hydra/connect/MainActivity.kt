@@ -14,6 +14,18 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Activity
+import android.content.pm.PackageManager
+import androidx.core.app.NotificationCompat
+import androidx.core.app.ActivityCompat
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.Date
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
@@ -38,11 +50,24 @@ class MainActivity : AppCompatActivity() {
     private val panel2 = Color.rgb(22, 37, 45)
     private val accent = Color.rgb(27, 211, 190)
     private val muted = Color.rgb(166, 181, 190)
+    private val notificationHandler = Handler(Looper.getMainLooper())
+    private var lastMessageId = ""
+    private var unreadMessages = 0
+    private val messagePoll = object : Runnable {
+        override fun run() {
+            if (token.isNotBlank()) checkNewMessages()
+            notificationHandler.postDelayed(this, 60_000)
+        }
+    }
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         token = getSharedPreferences("hc", Context.MODE_PRIVATE).getString("token", "") ?: ""
+        createNotificationChannel()
+        requestNotificationPermission()
+        lastMessageId = getSharedPreferences("hc", Context.MODE_PRIVATE).getString("last_message_id", "") ?: ""
         if (token.isBlank()) loginScreen() else loadHome()
+        notificationHandler.postDelayed(messagePoll, 8_000)
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
@@ -152,6 +177,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        notificationHandler.removeCallbacks(messagePoll)
+        super.onDestroy()
+    }
+
     private fun homeScreen() {
         val settings = portal.optJSONObject("settings") ?: JSONObject()
         val customer = portal.optJSONObject("customer") ?: JSONObject()
@@ -216,7 +246,15 @@ class MainActivity : AppCompatActivity() {
         service.addView(Space(this), LinearLayout.LayoutParams(1, dp(13)))
         val expRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         expRow.addView(label("EXPIRY", 10f, muted, true))
-        expRow.addView(label(customer.optString("expiry_at", "Not available"), 13f, Color.WHITE, true), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(12) })
+        val expiryRaw = customer.optString("expiry_at", "")
+        val days = daysRemaining(expiryRaw)
+        val expiryLabel = if (days != null) customer.optString("expiry_at", "Not available") + "  •  " + when {
+            days < 0 -> "EXPIRED"
+            days == 0L -> "EXPIRES TODAY"
+            days == 1L -> "1 DAY LEFT"
+            else -> "$days DAYS LEFT"
+        } else customer.optString("expiry_at", "Not available")
+        expRow.addView(label(expiryLabel, 13f, if (days != null && days <= 7) Color.rgb(255,190,92) else Color.WHITE, true), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(12) })
         expRow.addView(label("›", 26f, accent, true))
         service.addView(expRow)
         service.setOnClickListener { serviceScreen() }
@@ -229,7 +267,7 @@ class MainActivity : AppCompatActivity() {
 
         val grid = GridLayout(this).apply { columnCount = 2; alignmentMode = GridLayout.ALIGN_BOUNDS }
         addPremiumTile(grid, "✦", "News & Updates", "Latest announcements", "news")
-        addPremiumTile(grid, "✉", "Messages", "Contact your seller", "messages")
+        addPremiumTile(grid, "✉", if (unreadMessages > 0) "Messages  •  $unreadMessages NEW" else "Messages", if (unreadMessages > 0) "New message waiting" else "Contact your seller", "messages")
         addPremiumTile(grid, "!", "Report a Problem", "Get help quickly", "ticket")
         addPremiumTile(grid, "●", "Service Status", settings.optString("service_status", "All systems operational"), "status")
         addPremiumTile(grid, "⬡", "App Launcher", "Open installed apps", "launcher")
@@ -351,6 +389,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun messagesScreen() {
+        unreadMessages = 0
         baseScreen("Messages", "Private messages with your seller", true)
         val loading = label("Loading messages…", 14f, muted); root.addView(loading)
         get("messages.php") { j ->
@@ -554,6 +593,75 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_LONG).show()
+
+    private fun createNotificationChannel() {
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            val channel = NotificationChannel("hydra_messages", "Messages & service alerts", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Private messages and important HYDRA CONNECT alerts"
+                enableVibration(true)
+            }
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 7001)
+        }
+    }
+
+    private fun checkNewMessages() {
+        get("messages.php") { j ->
+            if (!j.optBoolean("ok")) return@get
+            val arr = j.optJSONArray("messages") ?: return@get
+            if (arr.length() == 0) return@get
+            val newest = arr.optJSONObject(arr.length() - 1) ?: return@get
+            val id = newest.optString("id", newest.optString("created_at") + "|" + newest.optString("body"))
+            val fromSeller = newest.optString("sender") != "customer"
+            if (lastMessageId.isBlank()) {
+                lastMessageId = id
+                getSharedPreferences("hc", Context.MODE_PRIVATE).edit().putString("last_message_id", id).apply()
+                return@get
+            }
+            if (id != lastMessageId) {
+                lastMessageId = id
+                getSharedPreferences("hc", Context.MODE_PRIVATE).edit().putString("last_message_id", id).apply()
+                if (fromSeller) {
+                    unreadMessages++
+                    showMessageNotification(newest.optString("body", "You have a new message from your seller."))
+                }
+            }
+        }
+    }
+
+    private fun showMessageNotification(body: String) {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val launch = packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java)
+        launch.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        val pending = PendingIntent.getActivity(this, 81, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val n = NotificationCompat.Builder(this, "hydra_messages")
+            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            .setContentTitle("New HYDRA CONNECT message")
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pending)
+            .build()
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(8101, n)
+    }
+
+    private fun daysRemaining(raw: String): Long? {
+        if (raw.isBlank()) return null
+        val formats = arrayOf("yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "dd/MM/yyyy")
+        for (fmt in formats) try {
+            val d = SimpleDateFormat(fmt, Locale.UK).parse(raw) ?: continue
+            return ((d.time - Date().time) / 86_400_000L).coerceAtLeast(-999)
+        } catch (_: Exception) {}
+        return null
+    }
 
     private fun get(ep: String, done: (JSONObject) -> Unit) {
         val r = Request.Builder().url(Config.API_BASE_URL + ep)
