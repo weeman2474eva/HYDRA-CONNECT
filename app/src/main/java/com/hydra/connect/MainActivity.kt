@@ -149,16 +149,19 @@ class MainActivity : AppCompatActivity() {
         val settings = portal.optJSONObject("settings") ?: JSONObject()
         val customer = portal.optJSONObject("customer") ?: JSONObject()
 
+        val stage = FrameLayout(this).apply { setBackgroundColor(Color.rgb(1, 7, 11)) }
+        stage.addView(HydraBackdrop(this), FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         val scroll = ScrollView(this).apply {
             isFillViewport = true
-            setBackgroundColor(Color.rgb(2, 10, 14))
+            setBackgroundColor(Color.TRANSPARENT)
         }
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(30))
+            setPadding(dp(18), dp(20), dp(18), dp(32))
         }
         scroll.addView(root)
-        setContentView(scroll)
+        stage.addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        setContentView(stage)
 
         // HYDRA hero
         val hero = LinearLayout(this).apply {
@@ -170,11 +173,9 @@ class MainActivity : AppCompatActivity() {
                 intArrayOf(Color.rgb(8, 42, 48), Color.rgb(4, 20, 27), Color.rgb(2, 11, 16))
             ).apply { cornerRadius = dp(26).toFloat(); setStroke(dp(1), Color.rgb(20, 91, 96)) }
         }
-        val mark = label("♆", 46f, accent, true).apply {
-            gravity = Gravity.CENTER
-            setShadowLayer(18f, 0f, 0f, accent)
-        }
-        hero.addView(mark)
+        val crest = HydraCrestView(this)
+        hero.addView(crest, LinearLayout.LayoutParams(dp(112), dp(76)))
+        hero.addView(Space(this), LinearLayout.LayoutParams(1, dp(4)))
         hero.addView(label(settings.optString("brand_name", "HYDRA CONNECT").uppercase(), 27f, Color.WHITE, true).apply {
             gravity = Gravity.CENTER; letterSpacing = .08f
         })
@@ -256,12 +257,8 @@ class MainActivity : AppCompatActivity() {
             ).apply { cornerRadius = dp(20).toFloat(); setStroke(dp(1), Color.rgb(25, 66, 73)) }
             isClickable = true
         }
-        val icon = TextView(this).apply {
-            text = glyph; gravity = Gravity.CENTER; textSize = 25f; typeface = Typeface.DEFAULT_BOLD
-            setTextColor(accent); setShadowLayer(12f, 0f, 0f, accent)
-            background = rounded(Color.rgb(5, 48, 51), 18, 1, Color.rgb(24, 114, 109))
-        }
-        card.addView(icon, LinearLayout.LayoutParams(dp(58), dp(58)))
+        val icon = NeonIconView(this, action)
+        card.addView(icon, LinearLayout.LayoutParams(dp(64), dp(64)))
         card.addView(Space(this), LinearLayout.LayoutParams(1, dp(10)))
         card.addView(label(title, 15f, Color.WHITE, true).apply { gravity = Gravity.CENTER })
         card.addView(Space(this), LinearLayout.LayoutParams(1, dp(4)))
@@ -459,6 +456,85 @@ class MainActivity : AppCompatActivity() {
     private fun emptyState(message: String) {
         val box = label(message, 15f, muted).apply { gravity = Gravity.CENTER; setPadding(dp(20), dp(30), dp(20), dp(30)); background = rounded(panel, 18) }
         root.addView(box)
+    }
+
+    private inner class HydraBackdrop(context: Context) : View(context) {
+        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            p.shader = LinearGradient(0f, 0f, width.toFloat(), height.toFloat(),
+                intArrayOf(Color.rgb(1,7,11), Color.rgb(3,22,28), Color.rgb(1,8,13)), null, Shader.TileMode.CLAMP)
+            canvas.drawRect(0f,0f,width.toFloat(),height.toFloat(),p)
+            p.shader = RadialGradient(width*.78f, height*.13f, width*.75f,
+                intArrayOf(Color.argb(95,0,215,198), Color.argb(22,0,130,140), Color.TRANSPARENT),
+                floatArrayOf(0f,.42f,1f), Shader.TileMode.CLAMP)
+            canvas.drawCircle(width*.78f,height*.13f,width*.75f,p)
+            p.shader = null
+            p.style = Paint.Style.STROKE; p.strokeWidth = 1f; p.color = Color.argb(28,48,225,211)
+            val s = dp(34).toFloat(); val h = s*.86f
+            var y = h
+            while (y < height) {
+                var x = if (((y/h).toInt()%2)==0) 0f else s*.75f
+                while (x < width+s) {
+                    val path=Path()
+                    for(i in 0..6){
+                        val a=Math.PI/3*i
+                        val px=x+(s*.48f*Math.cos(a)).toFloat(); val py=y+(s*.48f*Math.sin(a)).toFloat()
+                        if(i==0) path.moveTo(px,py) else path.lineTo(px,py)
+                    }
+                    canvas.drawPath(path,p); x+=s*1.5f
+                }
+                y+=h*1.45f
+            }
+            p.style=Paint.Style.FILL
+        }
+    }
+
+    private inner class HydraCrestView(context: Context) : View(context) {
+        private val p=Paint(Paint.ANTI_ALIAS_FLAG)
+        override fun onDraw(c:Canvas){
+            super.onDraw(c)
+            val cx=width/2f; val cy=height*.58f
+            p.style=Paint.Style.STROKE; p.strokeCap=Paint.Cap.ROUND; p.strokeJoin=Paint.Join.ROUND
+            p.strokeWidth=dp(4).toFloat(); p.color=accent
+            p.setShadowLayer(dp(9).toFloat(),0f,0f,accent); setLayerType(LAYER_TYPE_SOFTWARE,p)
+            val path=Path()
+            path.moveTo(cx,cy+dp(18)); path.cubicTo(cx-dp(4),cy, cx-dp(2),cy-dp(18), cx-dp(19),cy-dp(27))
+            path.cubicTo(cx-dp(34),cy-dp(35), cx-dp(42),cy-dp(20), cx-dp(29),cy-dp(14))
+            path.moveTo(cx,cy+dp(18)); path.cubicTo(cx+dp(4),cy, cx+dp(2),cy-dp(18), cx+dp(19),cy-dp(27))
+            path.cubicTo(cx+dp(34),cy-dp(35), cx+dp(42),cy-dp(20), cx+dp(29),cy-dp(14))
+            path.moveTo(cx,cy+dp(13)); path.cubicTo(cx,cy-dp(5),cx-dp(8),cy-dp(23),cx,cy-dp(34))
+            path.cubicTo(cx+dp(7),cy-dp(43),cx+dp(15),cy-dp(34),cx+dp(8),cy-dp(27))
+            c.drawPath(path,p)
+            p.style=Paint.Style.FILL; p.clearShadowLayer()
+            c.drawCircle(cx,cy+dp(19),dp(4).toFloat(),p)
+        }
+    }
+
+    private inner class NeonIconView(context: Context, private val kind:String) : View(context) {
+        private val p=Paint(Paint.ANTI_ALIAS_FLAG)
+        override fun onDraw(c:Canvas){
+            super.onDraw(c)
+            val cx=width/2f; val cy=height/2f
+            p.color=Color.rgb(5,45,50); p.style=Paint.Style.FILL
+            c.drawCircle(cx,cy,width*.45f,p)
+            p.color=Color.rgb(24,112,108); p.style=Paint.Style.STROKE; p.strokeWidth=dp(1).toFloat()
+            c.drawCircle(cx,cy,width*.45f,p)
+            p.color=accent; p.strokeWidth=dp(2).toFloat(); p.strokeCap=Paint.Cap.ROUND; p.strokeJoin=Paint.Join.ROUND
+            p.setShadowLayer(dp(5).toFloat(),0f,0f,accent); setLayerType(LAYER_TYPE_SOFTWARE,p)
+            val r=dp(15).toFloat()
+            when(kind){
+                "messages"->{ val q=RectF(cx-r,cy-r*.7f,cx+r,cy+r*.65f); c.drawRoundRect(q,dp(4).toFloat(),dp(4).toFloat(),p); c.drawLine(cx-r*.45f,cy+r*.65f,cx-r*.7f,cy+r,p) }
+                "news"->{ c.drawRect(cx-r,cy-r,cx+r,cy+r,p); c.drawLine(cx-r*.65f,cy-r*.45f,cx+r*.65f,cy-r*.45f,p); c.drawLine(cx-r*.65f,cy,cx+r*.65f,cy,p); c.drawLine(cx-r*.65f,cy+r*.45f,cx+r*.2f,cy+r*.45f,p) }
+                "ticket"->{ c.drawCircle(cx,cy,r,p); c.drawLine(cx,cy-r*.55f,cx,cy+r*.15f,p); c.drawCircle(cx,cy+r*.55f,dp(1).toFloat(),p) }
+                "status"->{ c.drawCircle(cx,cy,r,p); c.drawCircle(cx,cy,dp(4).toFloat(),p); c.drawArc(RectF(cx-r*.55f,cy-r*.55f,cx+r*.55f,cy+r*.55f),210f,120f,false,p) }
+                "launcher"->{ for(ix in -1..1) for(iy in -1..1) c.drawCircle(cx+ix*dp(9),cy+iy*dp(9),dp(2).toFloat(),p) }
+                "apps"->{ c.drawRect(cx-r,cy-r*.8f,cx+r,cy+r*.8f,p); c.drawLine(cx,cy-r*.45f,cx,cy+r*.25f,p); c.drawLine(cx-dp(5),cy+r*.05f,cx,cy+r*.3f,p); c.drawLine(cx+dp(5),cy+r*.05f,cx,cy+r*.3f,p) }
+                "renew"->{ c.drawArc(RectF(cx-r,cy-r,cx+r,cy+r),35f,285f,false,p); c.drawLine(cx+r*.75f,cy-r*.6f,cx+r*.95f,cy-r*.2f,p); c.drawLine(cx+r*.75f,cy-r*.6f,cx+r*.35f,cy-r*.55f,p) }
+                else->{ c.drawCircle(cx,cy-r*.35f,dp(6).toFloat(),p); c.drawArc(RectF(cx-r*.65f,cy,cx+r*.65f,cy+r),180f,180f,false,p) }
+            }
+            p.clearShadowLayer()
+        }
     }
 
     private fun logout() {
