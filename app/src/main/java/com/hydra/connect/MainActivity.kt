@@ -278,7 +278,7 @@ class MainActivity : AppCompatActivity() {
         addPremiumTile(grid, "✉", if (unreadMessages > 0) "Messages  •  $unreadMessages NEW" else "Messages", if (unreadMessages > 0) "New message waiting" else "Contact your seller", "messages")
         addPremiumTile(grid, "!", "Report a Problem", "Get help quickly", "ticket")
         addPremiumTile(grid, "●", "Service Status", settings.optString("service_status", "All systems operational"), "status")
-        addPremiumTile(grid, "⬡", "App Launcher", "Open installed apps", "launcher")
+        addPremiumTile(grid, "★", "Promotions", "Latest seller offers", "promotions")
         addPremiumTile(grid, "↓", "Downloads", "Recommended apps", "apps")
         addPremiumTile(grid, "↻", "Renew Service", "Request renewal", "renew")
         addPremiumTile(grid, "◉", "My Details", "Account information", "details")
@@ -322,7 +322,7 @@ class MainActivity : AppCompatActivity() {
                 "messages" -> messagesScreen()
                 "ticket" -> ticketScreen()
                 "status" -> statusScreen()
-                "launcher" -> launcherScreen()
+                "promotions" -> promotionsScreen()
                 "apps" -> appsScreen()
                 "renew" -> renewScreen()
                 "details" -> serviceScreen()
@@ -335,35 +335,34 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun launcherScreen() {
-        baseScreen("App Launcher", "Open apps installed on your phone", true)
-        val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
-        val apps = packageManager.queryIntentActivities(intent, 0)
-            .filter { it.activityInfo.packageName != packageName }
-            .sortedBy { it.loadLabel(packageManager).toString().lowercase() }
-        if (apps.isEmpty()) { emptyState("No launchable apps were found."); return }
-        val grid = GridLayout(this).apply { columnCount = 3; alignmentMode = GridLayout.ALIGN_BOUNDS }
-        val width = (resources.displayMetrics.widthPixels - dp(60)) / 3
-        for (info in apps) {
-            val item = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
-                setPadding(dp(7), dp(12), dp(7), dp(10))
-                background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(11,34,41), Color.rgb(5,20,27))).apply {
-                    cornerRadius = dp(18).toFloat(); setStroke(dp(1), Color.rgb(25,66,73))
-                }
-                isClickable = true
+    private fun promotionsScreen() {
+        baseScreen("Promotions", "Latest offers from your seller", true)
+        val promos = portal.optJSONArray("promotions") ?: JSONArray()
+        if (promos.length() == 0) { emptyState("No promotions are available right now."); return }
+        for (i in 0 until promos.length()) {
+            val p = promos.optJSONObject(i) ?: continue
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(18), dp(18), dp(18), dp(18))
+                background = rounded(panel, 20, accent)
             }
-            item.addView(ImageView(this).apply { setImageDrawable(info.loadIcon(packageManager)); scaleType = ImageView.ScaleType.FIT_CENTER }, LinearLayout.LayoutParams(dp(50), dp(50)))
-            item.addView(Space(this), LinearLayout.LayoutParams(1, dp(8)))
-            item.addView(label(info.loadLabel(packageManager).toString(), 11f, Color.WHITE, true).apply { gravity = Gravity.CENTER; maxLines = 2 })
-            item.setOnClickListener {
-                packageManager.getLaunchIntentForPackage(info.activityInfo.packageName)?.let { launch ->
-                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(launch)
-                }
+            card.addView(label("SPECIAL OFFER", 10f, accent, true))
+            card.addView(label(p.optString("title", "Promotion"), 21f, Color.WHITE, true))
+            val offer = p.optString("offer_text")
+            if (offer.isNotBlank()) card.addView(label(offer, 18f, accent, true))
+            val body = p.optString("body")
+            if (body.isNotBlank()) { card.addView(Space(this), LinearLayout.LayoutParams(1, dp(8))); card.addView(label(body, 14f, muted)) }
+            val endAt = p.optString("end_at")
+            if (endAt.isNotBlank()) { card.addView(Space(this), LinearLayout.LayoutParams(1, dp(8))); card.addView(label("Offer ends: " + endAt.replace("T", " "), 11f, muted)) }
+            val link = p.optString("link_url")
+            if (link.startsWith("http://") || link.startsWith("https://")) {
+                val button = actionButton(p.optString("button_text").ifBlank { "View offer" })
+                card.addView(Space(this), LinearLayout.LayoutParams(1, dp(12)))
+                card.addView(button, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)))
+                button.setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link))) }
             }
-            grid.addView(item, GridLayout.LayoutParams().apply { this.width = width; height = dp(112); setMargins(0,0,dp(8),dp(8)) })
+            root.addView(card); spacer(12)
         }
-        root.addView(grid)
     }
 
     private fun serviceScreen() {
