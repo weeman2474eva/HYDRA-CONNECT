@@ -169,19 +169,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadHome(openMessages: Boolean = false) {
+    private fun loadHome(openMessages: Boolean = false, openRenewal: Boolean = false) {
         get("portal.php") { j ->
             if (!j.optBoolean("ok")) { logout(); return@get }
             portal = j
-            if (openMessages) messagesScreen() else homeScreen()
+            checkRenewalCompletion(j.optJSONObject("renewal"))
+            when {
+                openMessages -> messagesScreen()
+                openRenewal -> renewScreen()
+                else -> homeScreen()
+            }
         }
     }
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent?.getBooleanExtra("open_messages", false) == true && token.isNotBlank()) {
-            loadHome(true)
+        if (token.isNotBlank()) {
+            when {
+                intent?.getBooleanExtra("open_messages", false) == true -> loadHome(openMessages = true)
+                intent?.getBooleanExtra("open_renewal", false) == true -> loadHome(openRenewal = true)
+            }
         }
     }
 
@@ -548,11 +556,26 @@ class MainActivity : AppCompatActivity() {
 
     private fun renewScreen() {
         val settings = portal.optJSONObject("settings") ?: JSONObject()
-        baseScreen("Renew Service", "Send a renewal request to your seller", true)
+        val renewal = portal.optJSONObject("renewal")
+        baseScreen("Renew Service", "Your renewal request and status", true)
+        if (renewal != null) {
+            val status = renewal.optString("status", "pending")
+            val statusBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(18), dp(18), dp(18)); background = rounded(if (status == "completed") Color.rgb(8, 64, 55) else panel, 18, 1, if (status == "completed") accent else Color.rgb(45,65,74)) }
+            statusBox.addView(label(if (status == "completed") "✓  RENEWAL COMPLETED" else "RENEWAL STATUS", 12f, if (status == "completed") accent else muted, true))
+            statusBox.addView(Space(this), LinearLayout.LayoutParams(1, dp(8)))
+            statusBox.addView(label(status.replaceFirstChar { it.uppercase() }, 22f, Color.WHITE, true))
+            val whenText = if (status == "completed") renewal.optString("updated_at") else renewal.optString("created_at")
+            if (whenText.isNotBlank()) statusBox.addView(label((if (status == "completed") "Completed: " else "Requested: ") + whenText, 12f, muted))
+            root.addView(statusBox); spacer(14)
+            if (status != "completed") {
+                root.addView(label("Your seller will update this status as your renewal is processed.", 14f, muted))
+                return
+            }
+        }
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(18), dp(18), dp(18)); background = rounded(panel, 18) }
         box.addView(label(settings.optString("renew_message", "Need more time? Send a renewal request and your seller will contact you."), 15f, muted))
         val note = input("Optional note", false, 3); box.addView(Space(this), LinearLayout.LayoutParams(1, dp(16))); box.addView(note)
-        val send = actionButton("Request renewal"); box.addView(Space(this), LinearLayout.LayoutParams(1, dp(12))); box.addView(send, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)))
+        val send = actionButton(if (renewal?.optString("status") == "completed") "Request another renewal" else "Request renewal"); box.addView(Space(this), LinearLayout.LayoutParams(1, dp(12))); box.addView(send, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)))
         root.addView(box)
         send.setOnClickListener {
             send.isEnabled = false
@@ -704,6 +727,40 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun checkRenewalCompletion(renewal: JSONObject?) {
+        if (renewal == null || renewal.optString("status") != "completed") return
+        val id = renewal.optString("id")
+        if (id.isBlank()) return
+        val prefs = getSharedPreferences("hc", Context.MODE_PRIVATE)
+        val seen = prefs.getString("completed_renewal_id", "") ?: ""
+        if (seen == id) return
+        prefs.edit().putString("completed_renewal_id", id).apply()
+        showRenewalNotification(renewal.optString("updated_at"))
+    }
+
+    private fun showRenewalNotification(completedAt: String) {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val launch = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("open_renewal", true)
+        }
+        val pending = PendingIntent.getActivity(this, 82, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val body = if (completedAt.isBlank()) "Your seller has completed your renewal." else "Completed $completedAt"
+        val n = NotificationCompat.Builder(this, "hydra_messages")
+            .setSmallIcon(android.R.drawable.checkbox_on_background)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setContentTitle("Your renewal has been completed")
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pending)
+            .build()
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(8201, n)
     }
 
     private fun showMessageNotification(body: String) {
