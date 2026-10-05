@@ -1,4 +1,4 @@
-name: Build HYDRA CONNECT APK
+name: Build HYDRA CONNECT APKs
 
 on:
   workflow_dispatch:
@@ -11,26 +11,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-
-      - name: Build debug APK
-        run: gradle assembleDebug
-
-      - name: Copy APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk HYDRA-CONNECT.apk
-
-      - name: Upload APK artifact
+      - name: Build customer and admin APKs
+        run: gradle :app:assembleDebug :hydraadmin:assembleDebug
+      - name: Copy APKs
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk HYDRA-CONNECT.apk
+          cp hydraadmin/build/outputs/apk/debug/hydraadmin-debug.apk HYDRA-CONNECT-ADMIN.apk
+      - name: Upload customer APK
         uses: actions/upload-artifact@v4
         with:
           name: HYDRA-CONNECT-APK
           path: HYDRA-CONNECT.apk
+      - name: Upload admin APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HYDRA-CONNECT-ADMIN-APK
+          path: HYDRA-CONNECT-ADMIN.apk
