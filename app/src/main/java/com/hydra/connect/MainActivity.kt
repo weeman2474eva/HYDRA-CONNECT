@@ -274,14 +274,22 @@ class MainActivity : AppCompatActivity() {
         })
 
         val grid = GridLayout(this).apply { columnCount = 2; alignmentMode = GridLayout.ALIGN_BOUNDS }
-        addPremiumTile(grid, "✦", "News & Updates", "Latest announcements", "news")
-        addPremiumTile(grid, "✉", if (unreadMessages > 0) "Messages  •  $unreadMessages NEW" else "Messages", if (unreadMessages > 0) "New message waiting" else "Contact your seller", "messages")
-        addPremiumTile(grid, "!", "Report a Problem", "Get help quickly", "ticket")
-        addPremiumTile(grid, "●", "Service Status", settings.optString("service_status", "All systems operational"), "status")
-        addPremiumTile(grid, "★", "Promotions", "Latest seller offers", "promotions")
-        addPremiumTile(grid, "↓", "Downloads", "Recommended apps", "apps")
-        addPremiumTile(grid, "↻", "Renew Service", "Request renewal", "renew")
-        addPremiumTile(grid, "◉", "My Details", "Account information", "details")
+        val configuredModules = settings.optString("modules", "service,news,messages,report,status,promotions,events,apps,renew,details")
+            .split(",").map { it.trim() }.filter { it.isNotBlank() }
+        val modules = if (configuredModules.isEmpty()) listOf("news","messages","report","status","promotions","events","apps","renew","details") else configuredModules
+        for (module in modules) {
+            when (module) {
+                "news" -> addPremiumTile(grid, "✦", "News & Updates", "Latest announcements", "news")
+                "messages" -> addPremiumTile(grid, "✉", if (unreadMessages > 0) "Messages  •  $unreadMessages NEW" else "Messages", if (unreadMessages > 0) "New message waiting" else "Contact your seller", "messages")
+                "report" -> addPremiumTile(grid, "!", "Report a Problem", "Get help quickly", "ticket")
+                "status" -> addPremiumTile(grid, "●", "Service Status", settings.optString("service_status", "All systems operational"), "status")
+                "promotions" -> addPremiumTile(grid, "★", "Promotions", "Latest seller offers", "promotions")
+                "events" -> addPremiumTile(grid, "▣", "Events & Channels", "What's on and where to find it", "events")
+                "apps" -> addPremiumTile(grid, "↓", "Downloads", "Recommended apps", "apps")
+                "renew" -> addPremiumTile(grid, "↻", "Renew Service", "Request renewal", "renew")
+                "details" -> addPremiumTile(grid, "◉", "My Details", "Account information", "details")
+            }
+        }
         root.addView(grid)
         spacer(8)
 
@@ -323,6 +331,7 @@ class MainActivity : AppCompatActivity() {
                 "ticket" -> ticketScreen()
                 "status" -> statusScreen()
                 "promotions" -> promotionsScreen()
+                "events" -> eventsScreen()
                 "apps" -> appsScreen()
                 "renew" -> renewScreen()
                 "details" -> serviceScreen()
@@ -333,6 +342,34 @@ class MainActivity : AppCompatActivity() {
             this.width = width; height = dp(156)
             setMargins(0, 0, dp(10), dp(10))
         })
+    }
+
+    private fun eventsScreen() {
+        baseScreen("Events & Channels", "What's on and where to find it", true)
+        val events = portal.optJSONArray("events") ?: JSONArray()
+        if (events.length() == 0) { emptyState("No upcoming events have been added yet."); return }
+        for (i in 0 until events.length()) {
+            val e = events.optJSONObject(i) ?: continue
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(18), dp(17), dp(18), dp(17))
+                background = rounded(panel, 20, accent)
+            }
+            val category = e.optString("category")
+            if (category.isNotBlank()) card.addView(label(category.uppercase(), 10f, accent, true))
+            card.addView(label(e.optString("title", "Event"), 20f, Color.WHITE, true))
+            val whenText = e.optString("event_at").replace("T", " ")
+            if (whenText.isNotBlank()) card.addView(label(whenText, 13f, Color.rgb(186, 207, 211), true))
+            val channels = e.optJSONArray("channels") ?: JSONArray()
+            if (channels.length() > 0) {
+                card.addView(Space(this), LinearLayout.LayoutParams(1, dp(12)))
+                card.addView(label("AVAILABLE ON", 10f, muted, true))
+                for (x in 0 until channels.length()) {
+                    card.addView(label("•  " + channels.optString(x), 14f, Color.WHITE))
+                }
+            }
+            root.addView(card); spacer(12)
+        }
     }
 
     private fun promotionsScreen() {
@@ -608,7 +645,7 @@ class MainActivity : AppCompatActivity() {
                 "news"->{ c.drawRect(cx-r,cy-r,cx+r,cy+r,p); c.drawLine(cx-r*.65f,cy-r*.45f,cx+r*.65f,cy-r*.45f,p); c.drawLine(cx-r*.65f,cy,cx+r*.65f,cy,p); c.drawLine(cx-r*.65f,cy+r*.45f,cx+r*.2f,cy+r*.45f,p) }
                 "ticket"->{ c.drawCircle(cx,cy,r,p); c.drawLine(cx,cy-r*.55f,cx,cy+r*.15f,p); c.drawCircle(cx,cy+r*.55f,dp(1).toFloat(),p) }
                 "status"->{ c.drawCircle(cx,cy,r,p); c.drawCircle(cx,cy,dp(4).toFloat(),p); c.drawArc(RectF(cx-r*.55f,cy-r*.55f,cx+r*.55f,cy+r*.55f),210f,120f,false,p) }
-                "launcher"->{ for(ix in -1..1) for(iy in -1..1) c.drawCircle(cx+ix*dp(9),cy+iy*dp(9),dp(2).toFloat(),p) }
+                "events"->{ c.drawRoundRect(RectF(cx-dp(17),cy-dp(14),cx+dp(17),cy+dp(16)),dp(4).toFloat(),dp(4).toFloat(),p); c.drawLine(cx-dp(17),cy-dp(5),cx+dp(17),cy-dp(5),p); c.drawLine(cx-dp(9),cy-dp(19),cx-dp(9),cy-dp(10),p); c.drawLine(cx+dp(9),cy-dp(19),cx+dp(9),cy-dp(10),p) }
                 "apps"->{ c.drawRect(cx-r,cy-r*.8f,cx+r,cy+r*.8f,p); c.drawLine(cx,cy-r*.45f,cx,cy+r*.25f,p); c.drawLine(cx-dp(5),cy+r*.05f,cx,cy+r*.3f,p); c.drawLine(cx+dp(5),cy+r*.05f,cx,cy+r*.3f,p) }
                 "renew"->{ c.drawArc(RectF(cx-r,cy-r,cx+r,cy+r),35f,285f,false,p); c.drawLine(cx+r*.75f,cy-r*.6f,cx+r*.95f,cy-r*.2f,p); c.drawLine(cx+r*.75f,cy-r*.6f,cx+r*.35f,cy-r*.55f,p) }
                 else->{ c.drawCircle(cx,cy-r*.35f,dp(6).toFloat(),p); c.drawArc(RectF(cx-r*.65f,cy,cx+r*.65f,cy+r),180f,180f,false,p) }
