@@ -11,6 +11,7 @@ import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.BitmapFactory
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -390,6 +391,27 @@ class MainActivity : AppCompatActivity() {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(18), dp(18), dp(18), dp(18))
                 background = rounded(panel, 20, accent)
+            }
+            val bannerUrl = p.optString("image_url")
+            if (bannerUrl.startsWith("http://") || bannerUrl.startsWith("https://")) {
+                val banner = ImageView(this).apply {
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    adjustViewBounds = true
+                    background = rounded(Color.rgb(8, 24, 30), 14)
+                }
+                card.addView(banner, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(150)).apply { bottomMargin = dp(14) })
+                Thread {
+                    try {
+                        val req = Request.Builder().url(bannerUrl).build()
+                        client.newCall(req).execute().use { rsp ->
+                            val bytes = rsp.body?.bytes()
+                            if (rsp.isSuccessful && bytes != null) {
+                                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                if (bitmap != null) runOnUiThread { banner.setImageBitmap(bitmap) }
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }.start()
             }
             card.addView(label("SPECIAL OFFER", 10f, accent, true))
             card.addView(label(p.optString("title", "Promotion"), 21f, Color.WHITE, true))
