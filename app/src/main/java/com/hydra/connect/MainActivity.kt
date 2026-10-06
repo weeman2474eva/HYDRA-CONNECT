@@ -27,6 +27,7 @@ import androidx.core.app.ActivityCompat
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.Date
+import kotlin.math.absoluteValue
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
@@ -54,9 +55,10 @@ class MainActivity : AppCompatActivity() {
     private val notificationHandler = Handler(Looper.getMainLooper())
     private var lastMessageId = ""
     private var unreadMessages = 0
+    private var lastPortalFingerprint = ""
     private val messagePoll = object : Runnable {
         override fun run() {
-            if (token.isNotBlank()) checkNewMessages()
+            if (token.isNotBlank()) { checkNewMessages(); checkPortalAlerts() }
             notificationHandler.postDelayed(this, 60_000)
         }
     }
@@ -175,6 +177,7 @@ class MainActivity : AppCompatActivity() {
             if (!j.optBoolean("ok")) { logout(); return@get }
             portal = j
             checkRenewalCompletion(j.optJSONObject("renewal"))
+            rememberPortalState(j)
             when {
                 openMessages -> messagesScreen()
                 openRenewal -> renewScreen()
@@ -190,6 +193,10 @@ class MainActivity : AppCompatActivity() {
             when {
                 intent?.getBooleanExtra("open_messages", false) == true -> loadHome(openMessages = true)
                 intent?.getBooleanExtra("open_renewal", false) == true -> loadHome(openRenewal = true)
+                intent?.getStringExtra("open_section") == "news" -> { loadHome(); notificationHandler.postDelayed({ newsScreen() }, 500) }
+                intent?.getStringExtra("open_section") == "promotions" -> { loadHome(); notificationHandler.postDelayed({ promotionsScreen() }, 500) }
+                intent?.getStringExtra("open_section") == "events" -> { loadHome(); notificationHandler.postDelayed({ eventsScreen() }, 500) }
+                intent?.getStringExtra("open_section") == "status" -> { loadHome(); notificationHandler.postDelayed({ statusScreen() }, 500) }
             }
         }
     }
@@ -749,6 +756,61 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun checkPortalAlerts() {
+        get("portal.php") { j ->
+            if (!j.optBoolean("ok")) return@get
+            val prefs = getSharedPreferences("hc", Context.MODE_PRIVATE)
+            fun newestId(a: JSONArray?): String {
+                if (a == null || a.length() == 0) return ""
+                val o = a.optJSONObject(0) ?: return ""
+                return o.optString("id", o.optString("created_at") + "|" + o.optString("title"))
+            }
+            val checks = listOf(
+                Triple("news", newestId(j.optJSONArray("posts")), "New announcement"),
+                Triple("promotions", newestId(j.optJSONArray("promotions")), "New promotion"),
+                Triple("events", newestId(j.optJSONArray("events")), "New event")
+            )
+            checks.forEach { (section, id, title) ->
+                val key = "last_alert_" + section
+                val old = prefs.getString(key, "") ?: ""
+                if (id.isNotBlank() && old.isNotBlank() && id != old) showSectionNotification(title, "Open HYDRA CONNECT to view the latest update.", section, 8300 + section.hashCode().absoluteValue % 500)
+                if (id.isNotBlank()) prefs.edit().putString(key, id).apply()
+            }
+            val status = j.optJSONObject("settings")?.optString("service_status", "") ?: ""
+            val oldStatus = prefs.getString("last_service_status", "") ?: ""
+            if (status.isNotBlank() && oldStatus.isNotBlank() && status != oldStatus) showSectionNotification("Service status updated", status, "status", 8401)
+            if (status.isNotBlank()) prefs.edit().putString("last_service_status", status).apply()
+            checkRenewalCompletion(j.optJSONObject("renewal"))
+        }
+    }
+
+    private fun rememberPortalState(j: JSONObject) {
+        val prefs = getSharedPreferences("hc", Context.MODE_PRIVATE)
+        fun seed(section: String, a: JSONArray?) {
+            if (a == null || a.length() == 0) return
+            val o = a.optJSONObject(0) ?: return
+            val id = o.optString("id", o.optString("created_at") + "|" + o.optString("title"))
+            if (!prefs.contains("last_alert_" + section) && id.isNotBlank()) prefs.edit().putString("last_alert_" + section, id).apply()
+        }
+        seed("news", j.optJSONArray("posts")); seed("promotions", j.optJSONArray("promotions")); seed("events", j.optJSONArray("events"))
+        val status = j.optJSONObject("settings")?.optString("service_status", "") ?: ""
+        if (!prefs.contains("last_service_status") && status.isNotBlank()) prefs.edit().putString("last_service_status", status).apply()
+    }
+
+    private fun showSectionNotification(title: String, body: String, section: String, id: Int) {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val launch = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("open_section", section)
+        }
+        val pending = PendingIntent.getActivity(this, id, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val n = NotificationCompat.Builder(this, "hydra_messages")
+            .setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body)).setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true).setContentIntent(pending).build()
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(id, n)
     }
 
     private fun checkRenewalCompletion(renewal: JSONObject?) {
