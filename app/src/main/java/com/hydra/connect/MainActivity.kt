@@ -292,7 +292,7 @@ class MainActivity : AppCompatActivity() {
         val grid = GridLayout(this).apply { columnCount = 2; alignmentMode = GridLayout.ALIGN_BOUNDS }
         val configuredModules = settings.optString("modules", "service,news,messages,report,status,promotions,events,apps,renew,details")
             .split(",").map { it.trim() }.filter { it.isNotBlank() }
-        val modules = if (configuredModules.isEmpty()) listOf("news","messages","report","status","promotions","events","apps","renew","details") else configuredModules
+        val modules = (if (configuredModules.isEmpty()) listOf("news","messages","report","status","promotions","events","apps","renew","details") else configuredModules).map { if (it == "launcher") "promotions" else it }.distinct().let { if ("promotions" in it) it else it.toMutableList().apply { add(indexOf("apps").let { pos -> if (pos < 0) size else pos }, "promotions") } }
         for (module in modules) {
             when (module) {
                 "news" -> addPremiumTile(grid, "✦", "News & Updates", "Latest announcements", "news")
