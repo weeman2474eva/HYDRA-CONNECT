@@ -573,11 +573,17 @@ class MainActivity : AppCompatActivity() {
             box.addView(label(a.optString("name", "App"), 18f, Color.WHITE, true))
             val version = a.optString("version"); if (version.isNotBlank()) box.addView(label("Version " + version, 12f, accent, true))
             box.addView(label(a.optString("description"), 13f, muted))
-            val download = actionButton("Open download")
-            box.addView(Space(this), LinearLayout.LayoutParams(1, dp(12))); box.addView(download, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)))
-            download.setOnClickListener {
-                val url = a.optString("download_url")
-                if (url.startsWith("http://") || url.startsWith("https://")) startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) else toast("No download link is available")
+            val url = a.optString("download_url")
+            if (url.isNotBlank()) {
+                box.addView(Space(this), LinearLayout.LayoutParams(1, dp(10)))
+                box.addView(label("DOWNLOAD ADDRESS", 11f, accent, true))
+                box.addView(label(url, 13f, Color.WHITE))
+            }
+            val code = a.optString("downloader_code")
+            if (code.isNotBlank()) {
+                box.addView(Space(this), LinearLayout.LayoutParams(1, dp(10)))
+                box.addView(label("DOWNLOADER CODE", 11f, accent, true))
+                box.addView(label(code, 22f, Color.WHITE, true))
             }
             root.addView(box); spacer(12)
         }
